@@ -32,6 +32,7 @@ interface AdminDashboardProps {
   studentsList: UserProfile[];
   onApproveStudent: (studentId: string) => void;
   onRejectStudent: (studentId: string) => void;
+  onOpenSchemaView?: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -41,7 +42,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onTestLevelInStudio,
   studentsList,
   onApproveStudent,
-  onRejectStudent
+  onRejectStudent,
+  onOpenSchemaView
 }) => {
   const [activeTab, setActiveTab] = useState<'approvals' | 'metrics' | 'editor' | 'database'>('approvals');
   const [selectedLevelId, setSelectedLevelId] = useState<string>(levels[0]?.id || 'syntax_level_1');
@@ -590,6 +592,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Tab 4: Database Schema */}
       {activeTab === 'database' && (
         <div className="space-y-6">
+          {onOpenSchemaView && (
+            <div className="bg-gradient-to-r from-amber-950/40 via-cyan-950/30 to-slate-900 border border-amber-500/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <Database className="w-5 h-5 text-amber-400 shrink-0" />
+                <div>
+                  <div className="font-bold text-white font-fantasy text-sm">Halaman Arsitektur Kurikulum Lengkap</div>
+                  <div className="text-slate-400">Lihat skema JSON terstruktur, visualisasi koleksi, dan DDL PostgreSQL dalam antarmuka penuh.</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenSchemaView}
+                className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold font-fantasy text-xs transition-colors shadow"
+              >
+                Buka Full Curriculum DB View →
+              </button>
+            </div>
+          )}
+
           <div className="bg-[#0c101a] border border-slate-800 rounded-2xl p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div>

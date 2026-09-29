@@ -572,6 +572,15 @@ export default function App() {
         user={currentUser}
         activeView={activeView === 'auth' ? 'landing' : activeView}
         onNavigate={(view) => {
+          if (view === 'schema') {
+            if (currentUser?.role === 'admin') {
+              setActiveView('schema');
+            } else {
+              setAuthTab('admin');
+              setActiveView('auth');
+            }
+            return;
+          }
           if (view === 'studio') {
             // When studio is clicked from navbar, show briefing first if not already in studio
             setActiveView('briefing');
@@ -681,9 +690,25 @@ export default function App() {
             studentsList={studentsList}
             onApproveStudent={handleApproveStudent}
             onRejectStudent={handleRejectStudent}
+            onOpenSchemaView={() => setActiveView('schema')}
           />
+        ) : activeView === 'schema' && currentUser?.role === 'admin' ? (
+          /* Curriculum DB - Restricted to Admin only */
+          <CurriculumSchemaView onBackToAdmin={() => setActiveView('admin')} />
         ) : (
-          <CurriculumSchemaView />
+          <HomeDashboard
+            user={currentUser}
+            selectedLanguage={selectedLanguage}
+            onSelectLanguage={(lang) => setSelectedLanguage(lang)}
+            onSelectLevel={handleSelectLevel}
+            onOpenInventory={() => setIsInventoryOpen(true)}
+            onOpenAchievements={() => setIsAchievementsOpen(true)}
+            onOpenAdmin={() => setActiveView('admin')}
+            onOpenRegister={() => {
+              setAuthTab('register');
+              setActiveView('auth');
+            }}
+          />
         )}
       </main>
 
@@ -736,13 +761,18 @@ export default function App() {
             >
               Tentang Kursus
             </button>
-            <span aria-hidden="true">·</span>
-            <button
-              onClick={() => setActiveView('schema')}
-              className="hover:text-amber-400 transition-colors"
-            >
-              Curriculum Schemas
-            </button>
+            {currentUser?.role === 'admin' && (
+              <>
+                <span aria-hidden="true">·</span>
+                <button
+                  onClick={() => setActiveView('schema')}
+                  className="hover:text-amber-400 transition-colors flex items-center gap-1"
+                >
+                  <span>Curriculum DB</span>
+                  <span className="text-[10px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-code font-bold">Admin</span>
+                </button>
+              </>
+            )}
             <span aria-hidden="true">·</span>
             <button
               onClick={() => {

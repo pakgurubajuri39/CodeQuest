@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProfile, SupportedLanguage } from '../../types/game';
-import { Flame, Sparkles, Backpack, LogOut, ShieldCheck, Trophy } from 'lucide-react';
+import { Flame, Sparkles, Backpack, LogOut, ShieldCheck, Trophy, Database } from 'lucide-react';
 
 interface NavbarProps {
   user: UserProfile | null;
@@ -59,12 +59,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Studio IDE
           </button>
-          <button
-            onClick={() => onNavigate('schema')}
-            className={`transition-colors hover:text-white ${activeView === 'schema' ? 'text-amber-400 font-semibold' : ''}`}
-          >
-            Curriculum DB
-          </button>
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => onNavigate('schema')}
+              className={`transition-colors hover:text-white flex items-center gap-1.5 ${activeView === 'schema' ? 'text-amber-400 font-semibold' : 'text-slate-300'}`}
+            >
+              <Database className="w-3.5 h-3.5 text-amber-400" />
+              <span>Curriculum DB</span>
+            </button>
+          )}
           {user?.role === 'admin' && (
             <button
               onClick={() => onNavigate('admin')}

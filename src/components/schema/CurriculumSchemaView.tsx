@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { REALMS_DATA, DATABASE_SCHEMAS } from '../../data/curriculum';
-import { Database, Copy, Check, Code2, Server, BookOpen, Layers } from 'lucide-react';
+import { Database, Copy, Check, Code2, Server, BookOpen, Layers, ArrowLeft, ShieldCheck } from 'lucide-react';
 
-export const CurriculumSchemaView: React.FC = () => {
+interface CurriculumSchemaViewProps {
+  onBackToAdmin?: () => void;
+}
+
+export const CurriculumSchemaView: React.FC<CurriculumSchemaViewProps> = ({ onBackToAdmin }) => {
   const [activeTab, setActiveTab] = useState<'realms_json' | 'mongo_schema' | 'postgres_ddl'>('realms_json');
   const [copied, setCopied] = useState(false);
 
@@ -27,25 +31,40 @@ export const CurriculumSchemaView: React.FC = () => {
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8 space-y-6">
       <div className="bg-[#0d1320] border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-code text-cyan-400 uppercase tracking-wider mb-1">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-code text-cyan-400 uppercase tracking-wider mb-1">
             <Server className="w-4 h-4" />
             <span>Database Integration & Curriculum Architecture</span>
+            <span className="px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800 text-[10px] font-bold flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-rose-400" />
+              <span>KHUSUS ADMINISTRATOR</span>
+            </span>
           </div>
           <h1 className="text-2xl font-black text-white font-fantasy tracking-wide">
-            Curriculum Data Structures & Schemas
+            Curriculum Data Structures & Database Schemas
           </h1>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            Production-ready JSON schemas and SQL definitions for MongoDB document collections and PostgreSQL relational tables, formatted for instant database seeding.
+            Struktur data kurikulum backend, skema MongoDB JSON, dan DDL PostgreSQL relasional untuk administrator & developer platform CodeQuest.
           </p>
         </div>
 
-        <button
-          onClick={handleCopy}
-          className="px-4 py-2.5 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all flex items-center gap-2 font-code shadow"
-        >
-          {copied ? <Check className="w-4 h-4 text-emerald-950" /> : <Copy className="w-4 h-4" />}
-          <span>{copied ? 'Copied to Clipboard!' : 'Copy Active Schema'}</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          {onBackToAdmin && (
+            <button
+              onClick={onBackToAdmin}
+              className="px-3.5 py-2.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl transition-all flex items-center gap-1.5 font-code"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Kembali ke Admin</span>
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="px-4 py-2.5 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-xl transition-all flex items-center gap-2 font-code shadow"
+          >
+            {copied ? <Check className="w-4 h-4 text-emerald-950" /> : <Copy className="w-4 h-4" />}
+            <span>{copied ? 'Tersalin!' : 'Salin Skema Aktif'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

@@ -166,19 +166,8 @@ export default function App() {
     return INITIAL_STUDENTS;
   });
 
-  // User session state (initially null to display the landing marketing page first)
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    // Check if there is an active session
-    const savedUser = localStorage.getItem('codequest_active_user');
-    if (savedUser) {
-      try {
-        return JSON.parse(savedUser);
-      } catch {
-        // Fall through
-      }
-    }
-    return null;
-  });
+  // User session state (strictly null on initial load so visitor enters as guest on landing page)
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   // Connect to Firebase Firestore on application mount
   useEffect(() => {

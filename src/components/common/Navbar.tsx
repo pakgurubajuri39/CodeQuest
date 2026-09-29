@@ -165,12 +165,22 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
           ) : (
-            <button
-              onClick={onOpenAuth}
-              className="px-4 py-2 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors whitespace-nowrap shadow-lg shadow-amber-500/20 font-code"
-            >
-              Enter Realm
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onOpenAuth}
+                className="px-3.5 py-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-700/80 transition-colors whitespace-nowrap font-code"
+              >
+                Masuk
+              </button>
+              {onOpenRegister && (
+                <button
+                  onClick={onOpenRegister}
+                  className="px-3.5 py-1.5 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors whitespace-nowrap shadow-md shadow-amber-500/20 font-fantasy"
+                >
+                  Daftar
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

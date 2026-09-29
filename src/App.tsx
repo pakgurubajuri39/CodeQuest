@@ -4,10 +4,25 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, LevelCurriculum, SupportedLanguage, UserRole } from './types/game';
+import {
+  UserProfile,
+  LevelCurriculum,
+  SupportedLanguage,
+  UserRole,
+  Achievement,
+  UserGameStats
+} from './types/game';
 import { ALL_LEVELS, DEFAULT_INVENTORY } from './data/curriculum';
+import {
+  ALL_ACHIEVEMENTS,
+  evaluateAchievements,
+  INITIAL_USER_STATS
+} from './data/achievements';
+import { sound } from './utils/audio';
 import { Navbar } from './components/common/Navbar';
 import { InventoryModal } from './components/common/InventoryModal';
+import { AchievementsPanel } from './components/achievements/AchievementsPanel';
+import { AchievementToast } from './components/achievements/AchievementToast';
 import { LandingPage } from './components/landing/LandingPage';
 import { AuthPage } from './components/auth/AuthPage';
 import { HomeDashboard } from './components/home/HomeDashboard';
@@ -47,7 +62,22 @@ const INITIAL_STUDENTS: UserProfile[] = [
       syntax_level_2: { stars: 2, highscore: 140, completedAt: '2026-09-28' }
     },
     equipped: DEFAULT_INVENTORY,
-    inventory: Object.values(DEFAULT_INVENTORY)
+    inventory: Object.values(DEFAULT_INVENTORY),
+    gameStats: {
+      totalCommandsRun: 42,
+      monstersSlain: 3,
+      totalGemsCollected: 120,
+      languagesUsed: ['python', 'javascript'],
+      briefingsRead: 2,
+      perfectLevelsCount: 1,
+      fastestCompletionSteps: 12
+    },
+    achievements: {
+      first_streak: { unlockedAt: '2026-09-25T10:00:00Z', claimed: true },
+      streak_adept: { unlockedAt: '2026-09-27T10:00:00Z', claimed: false },
+      first_spell: { unlockedAt: '2026-09-25T10:15:00Z', claimed: true },
+      polyglot_mage: { unlockedAt: '2026-09-28T09:00:00Z', claimed: false }
+    }
   },
   {
     id: 'stu_marcus_default',
@@ -68,7 +98,20 @@ const INITIAL_STUDENTS: UserProfile[] = [
       syntax_level_1: { stars: 3, highscore: 100, completedAt: '2026-09-27' }
     },
     equipped: DEFAULT_INVENTORY,
-    inventory: Object.values(DEFAULT_INVENTORY)
+    inventory: Object.values(DEFAULT_INVENTORY),
+    gameStats: {
+      totalCommandsRun: 18,
+      monstersSlain: 1,
+      totalGemsCollected: 60,
+      languagesUsed: ['python'],
+      briefingsRead: 1,
+      perfectLevelsCount: 1,
+      fastestCompletionSteps: 18
+    },
+    achievements: {
+      first_streak: { unlockedAt: '2026-09-22T10:00:00Z', claimed: true },
+      first_spell: { unlockedAt: '2026-09-22T10:30:00Z', claimed: true }
+    }
   },
   {
     id: 'stu_kira_pending',
@@ -87,7 +130,19 @@ const INITIAL_STUDENTS: UserProfile[] = [
     preferredLanguage: 'javascript',
     completedLevels: {},
     equipped: DEFAULT_INVENTORY,
-    inventory: Object.values(DEFAULT_INVENTORY)
+    inventory: Object.values(DEFAULT_INVENTORY),
+    gameStats: {
+      totalCommandsRun: 0,
+      monstersSlain: 0,
+      totalGemsCollected: 0,
+      languagesUsed: ['javascript'],
+      briefingsRead: 0,
+      perfectLevelsCount: 0,
+      fastestCompletionSteps: 999
+    },
+    achievements: {
+      first_streak: { unlockedAt: '2026-09-28T08:00:00Z', claimed: false }
+    }
   },
   {
     id: 'stu_rowan_pending',
@@ -106,7 +161,17 @@ const INITIAL_STUDENTS: UserProfile[] = [
     preferredLanguage: 'python',
     completedLevels: {},
     equipped: DEFAULT_INVENTORY,
-    inventory: Object.values(DEFAULT_INVENTORY)
+    inventory: Object.values(DEFAULT_INVENTORY),
+    gameStats: {
+      totalCommandsRun: 0,
+      monstersSlain: 0,
+      totalGemsCollected: 0,
+      languagesUsed: ['python'],
+      briefingsRead: 0,
+      perfectLevelsCount: 0,
+      fastestCompletionSteps: 999
+    },
+    achievements: {}
   }
 ];
 
@@ -128,7 +193,17 @@ const createTrialGuestUser = (): UserProfile => ({
   preferredLanguage: 'python',
   completedLevels: {},
   equipped: DEFAULT_INVENTORY,
-  inventory: Object.values(DEFAULT_INVENTORY)
+  inventory: Object.values(DEFAULT_INVENTORY),
+  gameStats: {
+    totalCommandsRun: 0,
+    monstersSlain: 0,
+    totalGemsCollected: 0,
+    languagesUsed: ['python'],
+    briefingsRead: 0,
+    perfectLevelsCount: 0,
+    fastestCompletionSteps: 999
+  },
+  achievements: {}
 });
 
 export default function App() {
@@ -148,6 +223,12 @@ export default function App() {
 
   // Inventory modal open state
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
+
+  // Dedicated Achievements modal panel state
+  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
+
+  // Toast notification for newly unlocked achievement
+  const [unlockedToastAchievement, setUnlockedToastAchievement] = useState<Achievement | null>(null);
 
   // Initial tab for auth page: 'login' | 'register' | 'admin'
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'admin'>('login');
@@ -179,7 +260,7 @@ export default function App() {
       if (remoteStudents.length > 0) {
         setStudentsList(remoteStudents);
 
-        // If active user is in the remote list, sync their status and XP live
+        // If active user is in the remote list, sync their status, XP and achievements live
         setCurrentUser((current) => {
           if (!current) return null;
           const match = remoteStudents.find((s) => s.id === current.id || s.username === current.username);
@@ -218,26 +299,42 @@ export default function App() {
 
   // Handle successful login from AuthPage
   const handleLoginSuccess = (user: UserProfile, redirectView: 'home' | 'admin') => {
-    setCurrentUser(user);
+    const evaluated = evaluateAchievements(user);
+    const updatedUser = {
+      ...user,
+      achievements: evaluated.updatedAchievements
+    };
+
+    if (evaluated.newlyUnlocked.length > 0) {
+      setUnlockedToastAchievement(evaluated.newlyUnlocked[0]);
+    }
+
+    setCurrentUser(updatedUser);
     setSelectedLanguage(user.preferredLanguage);
     setActiveView(redirectView);
   };
 
   // Handle new student registration (Sets status to 'pending' waiting for admin approval)
   const handleRegisterStudent = (newStudent: UserProfile) => {
+    const studentWithStats: UserProfile = {
+      ...newStudent,
+      gameStats: newStudent.gameStats || INITIAL_USER_STATS,
+      achievements: newStudent.achievements || {}
+    };
+
     setStudentsList((prev) => {
-      const exists = prev.some((s) => s.id === newStudent.id || s.username === newStudent.username);
+      const exists = prev.some((s) => s.id === studentWithStats.id || s.username === studentWithStats.username);
       if (exists) {
-        return prev.map((s) => (s.username === newStudent.username ? newStudent : s));
+        return prev.map((s) => (s.username === studentWithStats.username ? studentWithStats : s));
       }
-      return [newStudent, ...prev];
+      return [studentWithStats, ...prev];
     });
 
     // Save to Firebase Firestore database
-    saveStudent(newStudent);
+    saveStudent(studentWithStats);
 
-    setCurrentUser(newStudent);
-    setSelectedLanguage(newStudent.preferredLanguage);
+    setCurrentUser(studentWithStats);
+    setSelectedLanguage(studentWithStats.preferredLanguage);
   };
 
   // Admin approves a student -> unlocks full access (Levels 1-9)
@@ -284,6 +381,114 @@ export default function App() {
     setActiveView('landing');
   };
 
+  // Update Game Stats and check for new achievements
+  const handleUpdateGameStats = (delta: Partial<UserGameStats>) => {
+    if (!currentUser) return;
+
+    setCurrentUser((prev) => {
+      if (!prev) return null;
+      const currentStats = prev.gameStats || INITIAL_USER_STATS;
+      const newStats: UserGameStats = {
+        ...currentStats,
+        ...delta,
+        totalCommandsRun: (currentStats.totalCommandsRun || 0) + (delta.totalCommandsRun || 0),
+        monstersSlain: (currentStats.monstersSlain || 0) + (delta.monstersSlain || 0),
+        totalGemsCollected: (currentStats.totalGemsCollected || 0) + (delta.totalGemsCollected || 0),
+        briefingsRead: (currentStats.briefingsRead || 0) + (delta.briefingsRead || 0),
+        perfectLevelsCount: (currentStats.perfectLevelsCount || 0) + (delta.perfectLevelsCount || 0),
+        fastestCompletionSteps: Math.min(currentStats.fastestCompletionSteps || 999, delta.fastestCompletionSteps || 999),
+        languagesUsed: Array.from(new Set([...(currentStats.languagesUsed || []), ...(delta.languagesUsed || [])]))
+      };
+
+      const intermediateUser: UserProfile = {
+        ...prev,
+        gameStats: newStats
+      };
+
+      const { newlyUnlocked, updatedAchievements } = evaluateAchievements(intermediateUser);
+
+      if (newlyUnlocked.length > 0) {
+        setUnlockedToastAchievement(newlyUnlocked[0]);
+      }
+
+      const updatedUser: UserProfile = {
+        ...intermediateUser,
+        achievements: updatedAchievements
+      };
+
+      setStudentsList((list) => list.map((s) => (s.id === updatedUser.id ? updatedUser : s)));
+      saveStudent(updatedUser);
+      return updatedUser;
+    });
+  };
+
+  // Claim achievement reward (+XP, +Gems)
+  const handleClaimReward = (achievement: Achievement) => {
+    if (!currentUser) return;
+
+    setCurrentUser((prev) => {
+      if (!prev) return null;
+      const currentAchievements = { ...(prev.achievements || {}) };
+      currentAchievements[achievement.id] = {
+        unlockedAt: currentAchievements[achievement.id]?.unlockedAt || new Date().toISOString(),
+        claimed: true
+      };
+
+      const newXp = prev.xp + achievement.rewardXp;
+      const newGems = prev.gems + achievement.rewardGems;
+      const newLevel = Math.floor(newXp / 500) + 1;
+
+      const updatedUser: UserProfile = {
+        ...prev,
+        xp: newXp,
+        gems: newGems,
+        heroLevel: Math.max(prev.heroLevel, newLevel),
+        achievements: currentAchievements
+      };
+
+      setStudentsList((list) => list.map((s) => (s.id === updatedUser.id ? updatedUser : s)));
+      saveStudent(updatedUser);
+      return updatedUser;
+    });
+  };
+
+  // Claim all unlocked achievements at once
+  const handleClaimAllRewards = (unclaimedList: Achievement[]) => {
+    if (!currentUser || unclaimedList.length === 0) return;
+
+    setCurrentUser((prev) => {
+      if (!prev) return null;
+      const currentAchievements = { ...(prev.achievements || {}) };
+      let addedXp = 0;
+      let addedGems = 0;
+
+      unclaimedList.forEach((ach) => {
+        currentAchievements[ach.id] = {
+          unlockedAt: currentAchievements[ach.id]?.unlockedAt || new Date().toISOString(),
+          claimed: true
+        };
+        addedXp += ach.rewardXp;
+        addedGems += ach.rewardGems;
+      });
+
+      const newXp = prev.xp + addedXp;
+      const newGems = prev.gems + addedGems;
+      const newLevel = Math.floor(newXp / 500) + 1;
+
+      const updatedUser: UserProfile = {
+        ...prev,
+        xp: newXp,
+        gems: newGems,
+        heroLevel: Math.max(prev.heroLevel, newLevel),
+        achievements: currentAchievements
+      };
+
+      setStudentsList((list) => list.map((s) => (s.id === updatedUser.id ? updatedUser : s)));
+      saveStudent(updatedUser);
+      return updatedUser;
+    });
+  };
+
   // When a student clears a quest in Studio
   const handleCompleteLevel = (levelId: string, stars: number, highscore: number) => {
     if (!currentUser) return;
@@ -301,7 +506,7 @@ export default function App() {
       const newXp = prev.xp + (currentProgress ? Math.round(addedXp * 0.3) : addedXp);
       const newLevel = Math.floor(newXp / 500) + 1;
 
-      const updatedUser: UserProfile = {
+      const intermediateUser: UserProfile = {
         ...prev,
         xp: newXp,
         gems: prev.gems + (currentProgress ? Math.round(addedGems * 0.5) : addedGems),
@@ -314,6 +519,17 @@ export default function App() {
             completedAt: new Date().toISOString().split('T')[0]
           }
         }
+      };
+
+      // Check achievements on quest completion
+      const { newlyUnlocked, updatedAchievements } = evaluateAchievements(intermediateUser);
+      if (newlyUnlocked.length > 0) {
+        setUnlockedToastAchievement(newlyUnlocked[0]);
+      }
+
+      const updatedUser: UserProfile = {
+        ...intermediateUser,
+        achievements: updatedAchievements
       };
 
       // Also update in studentsList if registered
@@ -364,6 +580,7 @@ export default function App() {
           }
         }}
         onOpenInventory={() => setIsInventoryOpen(true)}
+        onOpenAchievements={() => setIsAchievementsOpen(true)}
         onLogout={handleLogout}
         onOpenAuth={() => {
           setAuthTab('login');
@@ -415,6 +632,7 @@ export default function App() {
             onSelectLanguage={(lang) => setSelectedLanguage(lang)}
             onSelectLevel={handleSelectLevel}
             onOpenInventory={() => setIsInventoryOpen(true)}
+            onOpenAchievements={() => setIsAchievementsOpen(true)}
             onOpenAdmin={() => setActiveView('admin')}
             onOpenRegister={() => {
               setAuthTab('register');
@@ -428,7 +646,10 @@ export default function App() {
             user={currentUser}
             selectedLanguage={selectedLanguage}
             onSelectLanguage={(lang) => setSelectedLanguage(lang)}
-            onStartCoding={() => setActiveView('studio')}
+            onStartCoding={() => {
+              handleUpdateGameStats({ briefingsRead: 1 });
+              setActiveView('studio');
+            }}
             onBackToMap={() => setActiveView('home')}
           />
         ) : activeView === 'studio' ? (
@@ -442,6 +663,8 @@ export default function App() {
             onSelectLevel={handleSelectLevel}
             onBackToMap={() => setActiveView('home')}
             onOpenTheory={() => setActiveView('briefing')}
+            onOpenAchievements={() => setIsAchievementsOpen(true)}
+            onUpdateStats={handleUpdateGameStats}
             onOpenRegister={() => {
               setAuthTab('register');
               setActiveView('auth');
@@ -469,6 +692,29 @@ export default function App() {
           user={currentUser}
           isOpen={isInventoryOpen}
           onClose={() => setIsInventoryOpen(false)}
+        />
+      )}
+
+      {/* Dedicated Achievements Vault Panel */}
+      {currentUser && (
+        <AchievementsPanel
+          user={currentUser}
+          isOpen={isAchievementsOpen}
+          onClose={() => setIsAchievementsOpen(false)}
+          onClaimReward={handleClaimReward}
+          onClaimAllRewards={handleClaimAllRewards}
+        />
+      )}
+
+      {/* Achievement Unlocked Pop-up Toast */}
+      {currentUser && (
+        <AchievementToast
+          achievement={unlockedToastAchievement}
+          onClose={() => setUnlockedToastAchievement(null)}
+          onOpenPanel={() => {
+            setUnlockedToastAchievement(null);
+            setIsAchievementsOpen(true);
+          }}
         />
       )}
 

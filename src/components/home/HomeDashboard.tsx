@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile, LevelCurriculum, SupportedLanguage } from '../../types/game';
 import { REALMS_DATA, ALL_LEVELS } from '../../data/curriculum';
+import { ALL_ACHIEVEMENTS, getAchievementProgress } from '../../data/achievements';
 import {
   Play,
   Sparkles,
@@ -15,6 +16,8 @@ import {
   Clock,
   UserPlus,
   Compass,
+  Trophy,
+  Crown,
   X
 } from 'lucide-react';
 import worldMapImg from '../../assets/images/codequest_world_map_1790602253800.jpg';
@@ -25,6 +28,7 @@ interface HomeDashboardProps {
   onSelectLanguage: (lang: SupportedLanguage) => void;
   onSelectLevel: (level: LevelCurriculum) => void;
   onOpenInventory: () => void;
+  onOpenAchievements?: () => void;
   onOpenAdmin: () => void;
   onOpenRegister: () => void;
 }
@@ -35,6 +39,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
   onSelectLanguage,
   onSelectLevel,
   onOpenInventory,
+  onOpenAchievements,
   onOpenAdmin,
   onOpenRegister
 }) => {
@@ -170,6 +175,21 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               <span className="text-[10px] text-orange-400/80 uppercase">Streak</span>
             </div>
 
+            {/* Achievements Trophy Button */}
+            {onOpenAchievements && (
+              <button
+                onClick={onOpenAchievements}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/30 hover:bg-amber-900/40 border border-amber-800/40 hover:border-amber-500/60 text-amber-300 transition-colors"
+                title="Buka Lemari Prestasi & Pencapaian Ksatria"
+              >
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <span className="font-bold tabular-nums text-sm">
+                  {Object.keys(user.achievements || {}).length}
+                </span>
+                <span className="text-[10px] text-amber-400/80 uppercase">Piala</span>
+              </button>
+            )}
+
             <button
               onClick={onOpenInventory}
               className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-amber-400/60 transition-colors text-slate-200"
@@ -260,6 +280,89 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({
               )}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* 2.5 Achievements Showcase Section */}
+      <section className="bg-[#0b0f1a] border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-5 mb-5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-400" />
+              <h3 className="text-lg sm:text-xl font-bold text-white font-fantasy">
+                Prestasi & Gelar Kehormatan Ksatria
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400">
+              Lacak kemajuan melampaui level: streak disiplin harian, efisiensi kode, dan penaklukan dungeon.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-code text-slate-300">
+              <span className="text-amber-400 font-bold">{Object.keys(user.achievements || {}).length}</span> / {ALL_ACHIEVEMENTS.length} Terbuka
+            </div>
+
+            {onOpenAchievements && (
+              <button
+                onClick={onOpenAchievements}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-amber-400 to-amber-300 hover:brightness-110 shadow-md shadow-amber-500/20 transition-all flex items-center gap-1.5 font-fantasy"
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Buka Lemari Piala</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 4 Featured Achievements Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {ALL_ACHIEVEMENTS.slice(0, 4).map((ach) => {
+            const { percentage, isUnlocked } = getAchievementProgress(ach, user);
+            return (
+              <div
+                key={ach.id}
+                onClick={onOpenAchievements}
+                className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                  isUnlocked
+                    ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-400/70 shadow-sm'
+                    : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border text-base ${
+                    isUnlocked
+                      ? 'bg-amber-950/80 border-amber-600/70 text-amber-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-500'
+                  }`}
+                >
+                  {isUnlocked ? '🏆' : '🔒'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between text-[10px] font-code">
+                    <span className={isUnlocked ? 'text-amber-300 font-bold' : 'text-slate-400'}>
+                      {ach.title}
+                    </span>
+                    <span className="text-slate-400">{percentage}%</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {ach.subtitle}
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 mt-2">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        isUnlocked ? 'bg-amber-400' : 'bg-slate-700'
+                      }`}
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
 

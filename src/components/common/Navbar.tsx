@@ -1,12 +1,13 @@
 import React from 'react';
 import { UserProfile, SupportedLanguage } from '../../types/game';
-import { Flame, Sparkles, Backpack, LogOut, ShieldCheck } from 'lucide-react';
+import { Flame, Sparkles, Backpack, LogOut, ShieldCheck, Trophy } from 'lucide-react';
 
 interface NavbarProps {
   user: UserProfile | null;
   activeView: 'landing' | 'home' | 'studio' | 'admin' | 'schema' | 'briefing' | 'auth';
   onNavigate: (view: 'landing' | 'home' | 'studio' | 'admin' | 'schema' | 'briefing' | 'auth') => void;
   onOpenInventory: () => void;
+  onOpenAchievements?: () => void;
   onLogout: () => void;
   onOpenAuth: () => void;
   onOpenRegister?: () => void;
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeView,
   onNavigate,
   onOpenInventory,
+  onOpenAchievements,
   onLogout,
   onOpenAuth,
   onOpenRegister,
@@ -133,11 +135,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={onOpenInventory}
                 className="p-2 text-slate-300 hover:text-white bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800 transition-colors"
-                title="Open Hero Inventory"
-                aria-label="Open Hero Inventory"
+                title="Buka Inventori Ksatria"
+                aria-label="Buka Inventori Ksatria"
               >
                 <Backpack className="w-4 h-4 text-amber-400" />
               </button>
+
+              {/* Achievements Vault Button */}
+              {onOpenAchievements && (
+                <button
+                  onClick={onOpenAchievements}
+                  className="p-2 text-slate-300 hover:text-amber-400 bg-slate-900/80 hover:bg-slate-800 rounded-lg border border-slate-800 transition-colors relative"
+                  title="Buka Lemari Prestasi & Pencapaian Ksatria"
+                  aria-label="Buka Lemari Prestasi & Pencapaian Ksatria"
+                >
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  {user.achievements && Object.values(user.achievements).some((a) => !a.claimed) && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
+                  )}
+                </button>
+              )}
 
               {/* User Avatar & Logout */}
               <div className="flex items-center gap-2 pl-1 border-l border-slate-800">

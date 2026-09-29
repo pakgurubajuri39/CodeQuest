@@ -6,7 +6,8 @@ import {
   SimulationStep,
   ConsoleMessage,
   GridItem,
-  GridEnemy
+  GridEnemy,
+  UserGameStats
 } from '../../types/game';
 import { ALL_LEVELS } from '../../data/curriculum';
 import { interpreter } from '../../game/interpreter';
@@ -29,7 +30,8 @@ import {
   Volume2,
   VolumeX,
   FastForward,
-  Eye
+  Eye,
+  Trophy
 } from 'lucide-react';
 
 interface StudioProps {
@@ -42,6 +44,8 @@ interface StudioProps {
   onBackToMap: () => void;
   onOpenTheory?: () => void;
   onOpenRegister?: () => void;
+  onOpenAchievements?: () => void;
+  onUpdateStats?: (statsDelta: Partial<UserGameStats>) => void;
 }
 
 export const Studio: React.FC<StudioProps> = ({
@@ -53,7 +57,9 @@ export const Studio: React.FC<StudioProps> = ({
   onSelectLevel,
   onBackToMap,
   onOpenTheory,
-  onOpenRegister
+  onOpenRegister,
+  onOpenAchievements,
+  onUpdateStats
 }) => {
   // Code editor state
   const [code, setCode] = useState(level.starterCode[selectedLanguage]);
@@ -229,6 +235,13 @@ export const Studio: React.FC<StudioProps> = ({
 
     const steps = parseResult.steps;
     addConsoleMessage('info', `Spell compiled successfully into ${steps.length} sequential execution actions.`);
+
+    if (onUpdateStats) {
+      onUpdateStats({
+        totalCommandsRun: (user.gameStats?.totalCommandsRun || 0) + steps.length,
+        languagesUsed: Array.from(new Set([...(user.gameStats?.languagesUsed || []), selectedLanguage]))
+      });
+    }
 
     // Delay helper governed by execSpeed
     const stepDelay = () => Math.max(80, 400 / execSpeed);
@@ -454,6 +467,16 @@ export const Studio: React.FC<StudioProps> = ({
       setShowVictoryModal(true);
 
       onCompleteLevel(level.id, stars, highscore);
+
+      if (onUpdateStats) {
+        const deadEnemiesCount = enemiesRef.current.filter((e) => !e.isAlive).length;
+        onUpdateStats({
+          monstersSlain: (user.gameStats?.monstersSlain || 0) + deadEnemiesCount,
+          totalGemsCollected: (user.gameStats?.totalGemsCollected || 0) + gemsCollected,
+          perfectLevelsCount: (user.gameStats?.perfectLevelsCount || 0) + (stars === 3 ? 1 : 0),
+          fastestCompletionSteps: Math.min(user.gameStats?.fastestCompletionSteps || 999, actionsTaken)
+        });
+      }
     }
   };
 
@@ -576,6 +599,21 @@ export const Studio: React.FC<StudioProps> = ({
             <Eye className="w-3.5 h-3.5 text-cyan-400" />
             <span>Peek Solution</span>
           </button>
+
+          {/* Achievements Trophy Button */}
+          {onOpenAchievements && (
+            <button
+              onClick={onOpenAchievements}
+              className="p-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400/60 text-amber-400 transition-colors relative"
+              title="Buka Lemari Prestasi & Pencapaian Ksatria"
+              aria-label="Buka Lemari Prestasi & Pencapaian Ksatria"
+            >
+              <Trophy className="w-4 h-4" />
+              {user.achievements && Object.values(user.achievements).some((a) => !a.claimed) && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
+              )}
+            </button>
+          )}
         </div>
       </div>
 

@@ -14,6 +14,39 @@ export interface InventoryItem {
   lore: string;
 }
 
+export interface UserGameStats {
+  totalCommandsRun: number;
+  monstersSlain: number;
+  totalGemsCollected: number;
+  languagesUsed: SupportedLanguage[];
+  briefingsRead: number;
+  perfectLevelsCount: number;
+  fastestCompletionSteps: number;
+}
+
+export type AchievementCategory = 'streak' | 'mastery' | 'combat' | 'exploration' | 'perfection';
+export type AchievementTier = 'bronze' | 'silver' | 'gold' | 'mythic';
+
+export interface Achievement {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  category: AchievementCategory;
+  tier: AchievementTier;
+  icon: string;
+  rewardXp: number;
+  rewardGems: number;
+  targetValue: number;
+  unit: string;
+  loreQuote: string;
+}
+
+export interface UnlockedAchievementRecord {
+  unlockedAt: string;
+  claimed: boolean;
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -38,6 +71,8 @@ export interface UserProfile {
     ring: InventoryItem;
   };
   inventory: InventoryItem[];
+  achievements?: Record<string, UnlockedAchievementRecord>;
+  gameStats?: UserGameStats;
 }
 
 export type TileType = 'floor' | 'wall' | 'spikes' | 'exit' | 'lava' | 'tree' | 'water';

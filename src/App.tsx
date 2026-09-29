@@ -624,6 +624,7 @@ export default function App() {
             onRegisterStudent={handleRegisterStudent}
             onStartTrial={handleStartTrial}
             initialTab={authTab}
+            studentsList={studentsList}
           />
         ) : activeView === 'home' ? (
           <HomeDashboard

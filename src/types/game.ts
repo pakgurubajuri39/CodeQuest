@@ -54,6 +54,7 @@ export interface UserProfile {
   role: UserRole;
   status: UserStatus;
   email?: string;
+  password?: string;
   registeredAt?: string;
   avatar: string;
   heroClass: 'Knight' | 'Sorcerer' | 'Ranger';

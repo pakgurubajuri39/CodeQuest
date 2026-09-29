@@ -23,13 +23,15 @@ interface AuthPageProps {
   onRegisterStudent: (user: UserProfile) => void;
   onStartTrial: () => void;
   initialTab?: 'login' | 'register' | 'admin';
+  studentsList?: UserProfile[];
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({
   onLoginSuccess,
   onRegisterStudent,
   onStartTrial,
-  initialTab = 'login'
+  initialTab = 'login',
+  studentsList = []
 }) => {
   const [authTab, setAuthTab] = useState<'login' | 'register' | 'admin'>(initialTab);
 
@@ -43,7 +45,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [registrationSubmitted, setRegistrationSubmitted] = useState<UserProfile | null>(null);
 
   // Student Login Form State
-  const [loginUsername, setLoginUsername] = useState('alex_arcane');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Admin form state
@@ -63,6 +66,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       username: username,
       displayName: heroName,
       email: regEmail.trim() || `${username}@student.codequest.edu`,
+      password: regPassword.trim() || undefined,
       role: 'student',
       status: 'pending', // PENDING APPROVAL BY ADMIN!
       registeredAt: new Date().toISOString().split('T')[0],
@@ -80,6 +84,18 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
     onRegisterStudent(newStudent);
     setRegistrationSubmitted(newStudent);
+
+    // Save directly to localStorage as immediate local cache
+    try {
+      const cur = localStorage.getItem('codequest_students_v3');
+      const list: UserProfile[] = cur ? JSON.parse(cur) : [];
+      if (!list.some((s) => s.username === newStudent.username || s.id === newStudent.id)) {
+        list.unshift(newStudent);
+        localStorage.setItem('codequest_students_v3', JSON.stringify(list));
+      }
+    } catch {
+      // ignore
+    }
   };
 
   // Handle Existing Student Login
@@ -87,55 +103,46 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     e.preventDefault();
     setLoginError(null);
 
-    // Retrieve approved/pending users from localStorage or mock
-    const savedStudentsRaw = localStorage.getItem('codequest_students');
-    let studentList: UserProfile[] = [];
-    if (savedStudentsRaw) {
-      try {
-        studentList = JSON.parse(savedStudentsRaw);
-      } catch {
-        studentList = [];
+    // Collect all registered students from props and local storage
+    const pool: UserProfile[] = [...studentsList];
+
+    const keysToTry = ['codequest_students_v3', 'codequest_students'];
+    keysToTry.forEach((k) => {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: UserProfile) => {
+              if (item && item.username && !pool.some((p) => p.username === item.username || p.id === item.id)) {
+                pool.push(item);
+              }
+            });
+          }
+        } catch {
+          // ignore parse errors
+        }
       }
-    }
+    });
 
     const uInput = loginUsername.trim().toLowerCase();
-    const matched = studentList.find(
-      (s) => s.username.toLowerCase() === uInput || s.displayName.toLowerCase() === uInput
-    );
+    const matched = pool.find((s) => {
+      const u = s.username ? s.username.toLowerCase() : '';
+      const em = s.email ? s.email.toLowerCase() : '';
+      const dn = s.displayName ? s.displayName.toLowerCase() : '';
+      return u === uInput || em === uInput || dn === uInput;
+    });
 
     if (matched) {
+      if (matched.password && loginPassword.trim() && matched.password !== loginPassword.trim()) {
+        setLoginError('Password yang Anda masukkan tidak sesuai. Silakan coba lagi.');
+        return;
+      }
       onLoginSuccess(matched, 'home');
       return;
     }
 
-    // Default sample student (approved)
-    if (uInput === 'alex_arcane' || uInput === 'alex the arcane' || uInput === 'aria') {
-      const alex: UserProfile = {
-        id: 'stu_alex_default',
-        username: 'alex_arcane',
-        displayName: 'Alex the Arcane',
-        role: 'student',
-        status: 'approved',
-        email: 'alex@academy.edu',
-        avatar: '⚔️',
-        heroClass: 'Knight',
-        xp: 450,
-        gems: 120,
-        heroLevel: 2,
-        streakDays: 4,
-        preferredLanguage: 'python',
-        completedLevels: {
-          syntax_level_1: { stars: 3, highscore: 100, completedAt: '2026-09-27' },
-          syntax_level_2: { stars: 2, highscore: 140, completedAt: '2026-09-28' }
-        },
-        equipped: DEFAULT_INVENTORY,
-        inventory: Object.values(DEFAULT_INVENTORY)
-      };
-      onLoginSuccess(alex, 'home');
-      return;
-    }
-
-    setLoginError('Username tidak ditemukan. Silakan lakukan pendaftaran baru terlebih dahulu.');
+    setLoginError('Akun tidak ditemukan. Pastikan username atau email yang Anda masukkan sesuai saat pendaftaran.');
   };
 
   // Handle Admin Login (hardcoded credentials: admin / bajuri39)
@@ -445,7 +452,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
-                  Username Siswa atau Nama Hero
+                  Username atau Email Siswa
                 </label>
                 <div className="relative">
                   <input
@@ -453,7 +460,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     required
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
-                    placeholder="Masukkan username Anda..."
+                    placeholder="Masukkan username atau email Anda..."
                     className="w-full px-3.5 py-3 bg-[#111726] border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs font-medium font-code"
                   />
                   <div className="absolute right-3.5 top-3.5 text-slate-500">
@@ -462,24 +469,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                <div>Sample siswa terdaftar yang disetujui:</div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setLoginUsername('alex_arcane')}
-                    className="text-amber-400 hover:underline font-code"
-                  >
-                    alex_arcane (Approved)
-                  </button>
-                  <span aria-hidden="true">·</span>
-                  <button
-                    type="button"
-                    onClick={() => setLoginUsername('aria')}
-                    className="text-amber-400 hover:underline font-code"
-                  >
-                    aria (Approved)
-                  </button>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="Masukkan password Anda..."
+                    className="w-full px-3.5 py-3 bg-[#111726] border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-400 text-xs font-medium font-code"
+                  />
+                  <div className="absolute right-3.5 top-3.5 text-slate-500">
+                    <Lock className="w-4 h-4" />
+                  </div>
                 </div>
               </div>
 

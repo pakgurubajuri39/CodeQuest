@@ -7,12 +7,14 @@ import {
   ConsoleMessage,
   GridItem,
   GridEnemy,
-  UserGameStats
+  UserGameStats,
+  BattleLogEntry
 } from '../../types/game';
 import { ALL_LEVELS } from '../../data/curriculum';
 import { interpreter } from '../../game/interpreter';
 import { canvasRenderer, HeroState, FloatingText } from '../../game/canvasRenderer';
 import { sound } from '../../utils/audio';
+import { BattleLogPanel } from './BattleLogPanel';
 import {
   Play,
   RotateCcw,
@@ -31,7 +33,8 @@ import {
   VolumeX,
   FastForward,
   Eye,
-  Trophy
+  Trophy,
+  Swords
 } from 'lucide-react';
 
 interface StudioProps {
@@ -71,6 +74,9 @@ export const Studio: React.FC<StudioProps> = ({
   const [executingLine, setExecutingLine] = useState<number | null>(null);
   const [execSpeed, setExecSpeed] = useState<number>(1); // 1x, 2x, 4x
   const [consoleLogs, setConsoleLogs] = useState<ConsoleMessage[]>([]);
+  const [battleLogs, setBattleLogs] = useState<BattleLogEntry[]>([]);
+  const [activeBottomTab, setActiveBottomTab] = useState<'battle' | 'console'>('battle');
+  const [heroHpState, setHeroHpState] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
 
   // Victory modal state
@@ -130,6 +136,18 @@ export const Studio: React.FC<StudioProps> = ({
     ]);
   };
 
+  const addBattleLog = (entry: Omit<BattleLogEntry, 'id' | 'timestamp'>) => {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setBattleLogs((prev) => [
+      ...prev.slice(-60),
+      {
+        ...entry,
+        id: `blog_${Date.now()}_${Math.random()}`,
+        timestamp: timeStr
+      }
+    ]);
+  };
+
   // Add floating text on canvas
   const addFloatingText = (text: string, x: number, y: number, color = '#f59e0b') => {
     floatingTextsRef.current.push({
@@ -161,6 +179,7 @@ export const Studio: React.FC<StudioProps> = ({
       attackProgress: 0,
       slashDir: 'right'
     };
+    setHeroHpState(100);
 
     gemsRef.current = level.gridMap.gems.map((g) => ({ ...g, collected: false }));
     enemiesRef.current = level.gridMap.enemies.map((e) => ({ ...e, hp: e.maxHp, isAlive: true }));
@@ -252,6 +271,17 @@ export const Studio: React.FC<StudioProps> = ({
     let actionsTaken = 0;
     let hasDied = false;
 
+    // Reset battle log on new run and set tab to battle log
+    setActiveBottomTab('battle');
+    addBattleLog({
+      turn: 0,
+      actor: 'hero',
+      actorName: user.displayName || 'Hero Knight',
+      actionType: 'move',
+      text: `🚀 Memulai eksekusi mantra (${steps.length} instruksi algoritma)...`,
+      heroHp: heroRef.current.hp
+    });
+
     for (let i = 0; i < steps.length; i++) {
       if (execAbortRef.current) break;
 
@@ -259,25 +289,92 @@ export const Studio: React.FC<StudioProps> = ({
       actionsTaken++;
       if (step.line) setExecutingLine(step.line);
 
+      // Helper to execute combat interaction against an enemy
+      const executeCombat = (enemy: GridEnemy, stepLine?: number) => {
+        heroRef.current.isAttacking = true;
+        sound.playAttack();
+        const dmg = 25;
+        enemy.hp = Math.max(0, enemy.hp - dmg);
+        sound.playHit();
+        addFloatingText(`-${dmg} HP`, enemy.x, enemy.y, '#ef4444');
+        addConsoleMessage('hero', `Hero struck ${enemy.name} for ${dmg} damage! (HP: ${enemy.hp}/${enemy.maxHp})`, stepLine);
+        addBattleLog({
+          turn: actionsTaken,
+          actor: 'hero',
+          actorName: user.displayName || 'Hero Knight',
+          actionType: 'attack',
+          text: `⚔️ Hero melancarkan tebasan pedang sihir ke ${enemy.name}! Menghasilkan ${dmg} damage.`,
+          damage: dmg,
+          target: enemy.name,
+          heroHp: heroRef.current.hp,
+          enemyHp: enemy.hp,
+          enemyMaxHp: enemy.maxHp,
+          line: stepLine
+        });
+
+        // ENEMY RETALIATION / RESPONSE
+        if (enemy.hp > 0) {
+          const retDmg = enemy.type === 'ogre' ? 12 : enemy.type === 'skeleton' ? 8 : 6;
+          heroRef.current.hp = Math.max(0, heroRef.current.hp - retDmg);
+          setHeroHpState(heroRef.current.hp);
+          sound.playHit();
+          addFloatingText(`-${retDmg} HP`, heroRef.current.x, heroRef.current.y, '#f43f5e');
+          addConsoleMessage('warn', `🛡️ ${enemy.name} membalas! Hero terkena ${retDmg} counter damage. (HP: ${heroRef.current.hp}/100)`, stepLine);
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'enemy',
+            actorName: enemy.name,
+            actionType: 'retaliate',
+            text: `🛡️ ${enemy.name} membalas dengan serangan balik! Hero menderita ${retDmg} luka pertempuran.`,
+            damage: retDmg,
+            target: user.displayName || 'Hero',
+            heroHp: heroRef.current.hp,
+            enemyHp: enemy.hp,
+            enemyMaxHp: enemy.maxHp,
+            line: stepLine
+          });
+
+          if (heroRef.current.hp <= 0) {
+            hasDied = true;
+            sound.playError();
+            addConsoleMessage('error', `Hero gugur dalam pertempuran melawan ${enemy.name}!`);
+            addBattleLog({
+              turn: actionsTaken,
+              actor: 'system',
+              actorName: 'Arena Keeper',
+              actionType: 'fail',
+              text: `💀 Hero kehabisan tenaga hidup dan gugur dalam duel sengit melawan ${enemy.name}!`,
+              heroHp: 0,
+              line: stepLine
+            });
+          }
+        } else {
+          enemy.isAlive = false;
+          addFloatingText('DEFEATED!', enemy.x, enemy.y, '#f59e0b');
+          addConsoleMessage('success', `${enemy.name} was defeated!`, stepLine);
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'enemy',
+            actorName: enemy.name,
+            actionType: 'defeat',
+            text: `💀 ${enemy.name} berhasil ditumpas dan hancur menjadi debu sihir! (+40 XP)`,
+            heroHp: heroRef.current.hp,
+            enemyHp: 0,
+            enemyMaxHp: enemy.maxHp,
+            line: stepLine
+          });
+        }
+
+        setTimeout(() => {
+          heroRef.current.isAttacking = false;
+        }, 150 / execSpeed);
+      };
+
       // Helper to check and attack enemy in path if blocked
       const attackEnemyAt = (tx: number, ty: number) => {
         const enemy = enemiesRef.current.find((e) => e.x === tx && e.y === ty && e.isAlive);
         if (enemy) {
-          heroRef.current.isAttacking = true;
-          sound.playAttack();
-          const dmg = 25;
-          enemy.hp = Math.max(0, enemy.hp - dmg);
-          sound.playHit();
-          addFloatingText(`-${dmg} HP`, enemy.x, enemy.y, '#ef4444');
-          addConsoleMessage('hero', `Hero struck ${enemy.name} for ${dmg} damage! (HP: ${enemy.hp}/${enemy.maxHp})`, step.line);
-          if (enemy.hp <= 0) {
-            enemy.isAlive = false;
-            addFloatingText('DEFEATED!', enemy.x, enemy.y, '#f59e0b');
-            addConsoleMessage('success', `${enemy.name} was defeated!`, step.line);
-          }
-          setTimeout(() => {
-            heroRef.current.isAttacking = false;
-          }, 150 / execSpeed);
+          executeCombat(enemy, step.line);
           return true;
         }
         return false;
@@ -291,6 +388,15 @@ export const Studio: React.FC<StudioProps> = ({
           heroRef.current.x = currentX;
           sound.playMove();
           addConsoleMessage('hero', `Hero moved Right to (${currentX}, ${currentY}).`, step.line);
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'hero',
+            actorName: user.displayName || 'Hero',
+            actionType: 'move',
+            text: `Hero melangkah ke Kanan menuju (${currentX}, ${currentY}).`,
+            heroHp: heroRef.current.hp,
+            line: step.line
+          });
         } else if (attackEnemyAt(targetX, currentY)) {
           // Attacked blocking enemy
         } else {
@@ -304,6 +410,15 @@ export const Studio: React.FC<StudioProps> = ({
           heroRef.current.x = currentX;
           sound.playMove();
           addConsoleMessage('hero', `Hero moved Left to (${currentX}, ${currentY}).`, step.line);
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'hero',
+            actorName: user.displayName || 'Hero',
+            actionType: 'move',
+            text: `Hero melangkah ke Kiri menuju (${currentX}, ${currentY}).`,
+            heroHp: heroRef.current.hp,
+            line: step.line
+          });
         } else if (attackEnemyAt(targetX, currentY)) {
           // Attacked blocking enemy
         } else {
@@ -317,6 +432,15 @@ export const Studio: React.FC<StudioProps> = ({
           heroRef.current.y = currentY;
           sound.playMove();
           addConsoleMessage('hero', `Hero moved Up to (${currentX}, ${currentY}).`, step.line);
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'hero',
+            actorName: user.displayName || 'Hero',
+            actionType: 'move',
+            text: `Hero melangkah ke Atas menuju (${currentX}, ${currentY}).`,
+            heroHp: heroRef.current.hp,
+            line: step.line
+          });
         } else if (attackEnemyAt(currentX, targetY)) {
           // Attacked blocking enemy
         } else {
@@ -330,6 +454,15 @@ export const Studio: React.FC<StudioProps> = ({
           heroRef.current.y = currentY;
           sound.playMove();
           addConsoleMessage('hero', `Hero moved Down to (${currentX}, ${currentY}).`, step.line);
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'hero',
+            actorName: user.displayName || 'Hero',
+            actionType: 'move',
+            text: `Hero melangkah ke Bawah menuju (${currentX}, ${currentY}).`,
+            heroHp: heroRef.current.hp,
+            line: step.line
+          });
         } else if (attackEnemyAt(currentX, targetY)) {
           // Attacked blocking enemy
         } else {
@@ -339,29 +472,32 @@ export const Studio: React.FC<StudioProps> = ({
         // Attack adjacent enemy
         heroRef.current.isAttacking = true;
         heroRef.current.slashDir = heroRef.current.dir;
-        sound.playAttack();
 
         // Check adjacent targets
         const adjacentEnemy = findAdjacentEnemy(currentX, currentY);
         if (adjacentEnemy && adjacentEnemy.isAlive) {
-          const dmg = 25;
-          adjacentEnemy.hp = Math.max(0, adjacentEnemy.hp - dmg);
-          sound.playHit();
-          addFloatingText(`-${dmg} HP`, adjacentEnemy.x, adjacentEnemy.y, '#ef4444');
-          addConsoleMessage('hero', `Hero slashed ${adjacentEnemy.name} for ${dmg} damage! (HP: ${adjacentEnemy.hp}/${adjacentEnemy.maxHp})`, step.line);
-
-          if (adjacentEnemy.hp <= 0) {
-            adjacentEnemy.isAlive = false;
-            addFloatingText('DEFEATED!', adjacentEnemy.x, adjacentEnemy.y, '#f59e0b');
-            addConsoleMessage('success', `${adjacentEnemy.name} was defeated!`, step.line);
-          }
+          executeCombat(adjacentEnemy, step.line);
         } else {
+          sound.playAttack();
           addConsoleMessage('info', 'Hero swung runic spellblade into thin air.', step.line);
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'hero',
+            actorName: user.displayName || 'Hero',
+            actionType: 'attack',
+            text: 'Hero mengayunkan pedang sihir ke udara kosong (tidak ada musuh di petak sekitar).',
+            heroHp: heroRef.current.hp,
+            line: step.line
+          });
+          setTimeout(() => {
+            heroRef.current.isAttacking = false;
+          }, 150 / execSpeed);
         }
+      }
 
-        setTimeout(() => {
-          heroRef.current.isAttacking = false;
-        }, 150 / execSpeed);
+      if (hasDied) {
+        setIsExecuting(false);
+        return;
       }
 
       // Check item pickups at new coordinate
@@ -372,20 +508,49 @@ export const Studio: React.FC<StudioProps> = ({
         sound.playGem();
         addFloatingText('+1 Ruby!', currentX, currentY, '#f43f5e');
         addConsoleMessage('success', `Soul Ruby collected at (${currentX}, ${currentY})! [${gemsCollected} Gems]`, step.line);
+        addBattleLog({
+          turn: actionsTaken,
+          actor: 'hero',
+          actorName: user.displayName || 'Hero',
+          actionType: 'gem',
+          text: `💎 Soul Ruby purba (${gemsCollected}/${level.gridMap.gems.length}) berhasil diamankan di (${currentX}, ${currentY})!`,
+          heroHp: heroRef.current.hp,
+          line: step.line
+        });
       }
 
       // Check spikes trap
       const isSpikeTile = level.gridMap.spikes.some((s) => s.x === currentX && s.y === currentY);
       if (isSpikeTile) {
         heroRef.current.hp = Math.max(0, heroRef.current.hp - 35);
+        setHeroHpState(heroRef.current.hp);
         sound.playHit();
         addFloatingText('-35 Trap Damage!', currentX, currentY, '#ef4444');
         addConsoleMessage('error', `Ouch! Stepped on cursed spikes at (${currentX}, ${currentY})! HP: ${heroRef.current.hp}/100`, step.line);
+        addBattleLog({
+          turn: actionsTaken,
+          actor: 'trap',
+          actorName: 'Cursed Spikes',
+          actionType: 'trap',
+          text: `💥 Perangkap duri kuno terinjak! Hero menerima 35 kerusakan tajam.`,
+          damage: 35,
+          heroHp: heroRef.current.hp,
+          line: step.line
+        });
 
         if (heroRef.current.hp <= 0) {
           hasDied = true;
           sound.playError();
           addConsoleMessage('error', 'Hero collapsed from lethal trap wounds! Quest failed.');
+          addBattleLog({
+            turn: actionsTaken,
+            actor: 'system',
+            actorName: 'Trap Hazard',
+            actionType: 'fail',
+            text: `💀 Hero tewas akibat luka parah terkena perangkap duri terkutuk! Quest gagal.`,
+            heroHp: 0,
+            line: step.line
+          });
           setIsExecuting(false);
           return;
         }
@@ -445,11 +610,27 @@ export const Studio: React.FC<StudioProps> = ({
       sound.playError();
       addConsoleMessage('warn', `Incomplete Victory: ${failedReason}`);
       addFloatingText('TRY AGAIN', finalX, finalY, '#f59e0b');
+      addBattleLog({
+        turn: actionsTaken,
+        actor: 'system',
+        actorName: 'Dungeon Master',
+        actionType: 'fail',
+        text: `⚠️ Misi belum selesai: ${failedReason}`,
+        heroHp: heroRef.current.hp
+      });
     } else {
       // VICTORY!
       sound.playVictory();
       addFloatingText('VICTORY!', finalX, finalY, '#10b981');
       addConsoleMessage('success', `★ VICTORY ACCOMPLISHED! ${level.title} Cleared!`);
+      addBattleLog({
+        turn: actionsTaken,
+        actor: 'system',
+        actorName: 'Victory Portal',
+        actionType: 'victory',
+        text: `🏆 Kemenangan diraih! Level ${level.title} berhasil ditaklukkan!`,
+        heroHp: heroRef.current.hp
+      });
 
       // Calculate Stars (3 stars for optimal steps / code)
       let stars = 3;
@@ -823,54 +1004,121 @@ export const Studio: React.FC<StudioProps> = ({
         </div>
       </div>
 
-      {/* Bottom Console Log Pane */}
-      <div className="bg-[#070a12] border border-slate-800 rounded-2xl p-4 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
-          <div className="flex items-center gap-2 font-code text-slate-300 font-semibold">
-            <Terminal className="w-4 h-4 text-amber-400" />
-            <span>Spellcasting Console & Execution Log</span>
+      {/* Bottom Pane: Real-Time Battle Log & Spell Console */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-xl border border-slate-800 text-xs">
+            <button
+              onClick={() => setActiveBottomTab('battle')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                activeBottomTab === 'battle'
+                  ? 'bg-gradient-to-r from-rose-500 to-amber-500 text-slate-950 shadow-md font-fantasy'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Swords className="w-3.5 h-3.5" />
+              <span>Real-Time Battle Log</span>
+              {battleLogs.length > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-code font-bold ${
+                    activeBottomTab === 'battle'
+                      ? 'bg-slate-950 text-amber-300'
+                      : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {battleLogs.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveBottomTab('console')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                activeBottomTab === 'console'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-fantasy'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Spellcasting Console</span>
+              {consoleLogs.length > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-code font-bold ${
+                    activeBottomTab === 'console'
+                      ? 'bg-slate-950 text-amber-300'
+                      : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {consoleLogs.length}
+                </span>
+              )}
+            </button>
           </div>
-          <button
-            onClick={() => setConsoleLogs([])}
-            className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors font-code"
-          >
-            Clear Log
-          </button>
+
+          <div className="text-[11px] text-slate-500 font-code hidden sm:flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span>{activeBottomTab === 'battle' ? 'Live Combat Feedback Active' : 'Console System Output'}</span>
+          </div>
         </div>
 
-        <div className="mt-3 font-code text-xs space-y-1 max-h-40 overflow-y-auto pr-2">
-          {consoleLogs.length === 0 ? (
-            <div className="text-slate-600 italic">No output logged yet. Click "Cast Code / Run" to execute actions.</div>
-          ) : (
-            consoleLogs.map((log) => {
-              let colorClass = 'text-slate-300';
-              let badge = 'LOG';
-              if (log.type === 'hero') {
-                colorClass = 'text-cyan-300';
-                badge = 'HERO';
-              } else if (log.type === 'success') {
-                colorClass = 'text-emerald-400 font-semibold';
-                badge = 'DONE';
-              } else if (log.type === 'warn') {
-                colorClass = 'text-amber-400';
-                badge = 'WARN';
-              } else if (log.type === 'error') {
-                colorClass = 'text-rose-400 font-semibold';
-                badge = 'ERR!';
-              }
+        {activeBottomTab === 'battle' ? (
+          <BattleLogPanel
+            logs={battleLogs}
+            isExecuting={isExecuting}
+            onClear={() => setBattleLogs([])}
+            heroHp={heroHpState}
+            maxHeroHp={100}
+          />
+        ) : (
+          <div className="bg-[#070a12] border border-slate-800 rounded-2xl p-4 shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
+              <div className="flex items-center gap-2 font-code text-slate-300 font-semibold">
+                <Terminal className="w-4 h-4 text-amber-400" />
+                <span>Spellcasting Console & Execution Log</span>
+              </div>
+              <button
+                onClick={() => setConsoleLogs([])}
+                className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors font-code"
+              >
+                Clear Log
+              </button>
+            </div>
 
-              return (
-                <div key={log.id} className="flex items-start gap-2 leading-relaxed">
-                  <span className="text-slate-600 text-[10px] tabular-nums shrink-0">{log.timestamp}</span>
-                  <span className="text-[10px] px-1 rounded bg-slate-900 border border-slate-800 text-slate-400 shrink-0">
-                    {badge}
-                  </span>
-                  <span className={`${colorClass} flex-1`}>{log.text}</span>
-                </div>
-              );
-            })
-          )}
-        </div>
+            <div className="mt-3 font-code text-xs space-y-1 max-h-56 overflow-y-auto pr-2">
+              {consoleLogs.length === 0 ? (
+                <div className="text-slate-600 italic">No output logged yet. Click "Cast Code / Run" to execute actions.</div>
+              ) : (
+                consoleLogs.map((log) => {
+                  let colorClass = 'text-slate-300';
+                  let badge = 'LOG';
+                  if (log.type === 'hero') {
+                    colorClass = 'text-cyan-300';
+                    badge = 'HERO';
+                  } else if (log.type === 'success') {
+                    colorClass = 'text-emerald-400 font-semibold';
+                    badge = 'DONE';
+                  } else if (log.type === 'warn') {
+                    colorClass = 'text-amber-400';
+                    badge = 'WARN';
+                  } else if (log.type === 'error') {
+                    colorClass = 'text-rose-400 font-semibold';
+                    badge = 'ERR!';
+                  }
+
+                  return (
+                    <div key={log.id} className="flex items-start gap-2 leading-relaxed">
+                      <span className="text-slate-600 text-[10px] tabular-nums shrink-0">{log.timestamp}</span>
+                      <span className="text-[10px] px-1 rounded bg-slate-900 border border-slate-800 text-slate-400 shrink-0">
+                        {badge}
+                      </span>
+                      <span className={`${colorClass} flex-1`}>{log.text}</span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Peek Solution Modal */}

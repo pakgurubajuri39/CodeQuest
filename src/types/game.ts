@@ -189,6 +189,22 @@ export interface ConsoleMessage {
   timestamp: string;
 }
 
+export interface BattleLogEntry {
+  id: string;
+  turn: number;
+  actor: 'hero' | 'enemy' | 'trap' | 'system';
+  actorName: string;
+  actionType: 'attack' | 'retaliate' | 'move' | 'gem' | 'trap' | 'defeat' | 'victory' | 'fail';
+  text: string;
+  damage?: number;
+  target?: string;
+  heroHp: number;
+  enemyHp?: number;
+  enemyMaxHp?: number;
+  line?: number;
+  timestamp: string;
+}
+
 export interface StudentMetric {
   id: string;
   name: string;

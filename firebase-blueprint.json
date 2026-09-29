@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Student profile, gamification stats, quest progress, and registration approval status.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the student or user.",
+          "maxLength": 128
+        },
+        "username": {
+          "type": "string",
+          "description": "Unique lowercase username used for login.",
+          "maxLength": 64
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name or hero title.",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the student.",
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "User role: student or admin.",
+          "enum": ["student", "admin"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Approval status of student registration.",
+          "enum": ["trial", "pending", "approved", "rejected"]
+        },
+        "heroClass": {
+          "type": "string",
+          "description": "Hero class chosen by the apprentice.",
+          "enum": ["Knight", "Sorcerer", "Ranger"]
+        },
+        "xp": {
+          "type": "number",
+          "description": "Accumulated Arcane Experience Points."
+        },
+        "gems": {
+          "type": "number",
+          "description": "Soul gems collected in dungeons."
+        },
+        "heroLevel": {
+          "type": "number",
+          "description": "Current hero level."
+        },
+        "streakDays": {
+          "type": "number",
+          "description": "Daily quest activity streak."
+        },
+        "preferredLanguage": {
+          "type": "string",
+          "description": "Default code language: python or javascript.",
+          "enum": ["python", "javascript"]
+        },
+        "registeredAt": {
+          "type": "string",
+          "description": "ISO date string of registration."
+        }
+      },
+      "required": ["id", "username", "displayName", "role", "status"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of student profiles, quest milestones, and approval states."
+    }
+  }
+}

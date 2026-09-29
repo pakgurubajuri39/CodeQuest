@@ -1,0 +1,6 @@
+{
+  "name": "CodeQuest",
+  "description": "Educational Fantasy RPG Coding Game for mastering Python and JavaScript through interactive dungeon exploration and puzzle combat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

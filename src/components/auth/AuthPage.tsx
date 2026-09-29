@@ -47,8 +47,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Admin form state
-  const [adminUsername, setAdminUsername] = useState('admin');
-  const [adminPassword, setAdminPassword] = useState('bajuri39');
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [adminError, setAdminError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -179,7 +179,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         onLoginSuccess(adminProfile, 'admin');
       } else {
         setIsSubmitting(false);
-        setAdminError('Kredensial salah. Gunakan username "admin" dan password "bajuri39"');
+        setAdminError('Username atau password admin salah. Silakan periksa kembali.');
       }
     }, 300);
   };
@@ -504,14 +504,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
           ) : (
             /* Admin Login Form */
             <form onSubmit={handleAdminSubmit} className="space-y-4">
-              <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-800/40 text-xs text-cyan-200 flex items-start gap-2.5">
-                <KeyRound className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-cyan-300">Kredensial Guru / Admin:</span>
-                  <div className="font-code mt-0.5 text-slate-300">
-                    Username: <span className="text-amber-300 font-bold">admin</span> · Password: <span className="text-amber-300 font-bold">bajuri39</span>
-                  </div>
-                </div>
+              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 flex items-center gap-2.5">
+                <KeyRound className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Masuk dengan akun Guru / Administrator untuk mengelola kurikulum dan persetujuan siswa.</span>
               </div>
 
               {adminError && (

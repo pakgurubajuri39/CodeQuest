@@ -720,7 +720,7 @@ export const Studio: React.FC<StudioProps> = ({
         </div>
 
         {/* Right Action Tools: Materi Briefing, Language, Audio, Solution */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Read Theory / Materi Briefing Button */}
           <button
             onClick={() => {
